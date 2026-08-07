@@ -36,6 +36,9 @@ var scanCmdExamples = fmt.Sprintf(`
   # Display all resources
   %[1]s scan --verbose
 
+  # Show evidence for failed controls
+  %[1]s scan --show-evidence
+
   # Generate an anonymized report
   %[1]s scan --hide --format json -o report.json
 
@@ -188,6 +191,7 @@ func GetScanCommand(ks meta.IKubescape) *cobra.Command {
 	scanCmd.PersistentFlags().BoolVarP(&scanInfo.Local, "keep-local", "", false, "If you do not want your Kubescape results reported to configured backend.")
 	scanCmd.PersistentFlags().StringVarP(&scanInfo.Output, "output", "o", "", "Output file. Print output to file and not stdout")
 	scanCmd.PersistentFlags().BoolVarP(&scanInfo.VerboseMode, "verbose", "v", false, "Display all of the input resources and not only failed resources")
+	scanCmd.PersistentFlags().BoolVarP(&scanInfo.ShowEvidence, "show-evidence", "E", false, "Show detailed evidence for failed controls including field values and file locations")
 	scanCmd.PersistentFlags().StringVar(&scanInfo.View, "view", string(cautils.SecurityViewType), fmt.Sprintf("View results based on the %s/%s/%s. default is --view=%s", cautils.ResourceViewType, cautils.ControlViewType, cautils.SecurityViewType, cautils.SecurityViewType))
 	scanCmd.PersistentFlags().BoolVar(&scanInfo.UseDefault, "use-default", false, "Load local policy object from default path. If not used will download latest")
 	scanCmd.PersistentFlags().StringSliceVar(&scanInfo.UseFrom, "use-from", nil, "Load local policy object from specified path. If not used will download latest")

@@ -121,6 +121,7 @@ type ScanInfo struct {
 	UseArtifactsFrom      string   // Load artifacts from local path. Use when running offline
 	ControlsVersion       string   // Pin the regolibrary release used to download policies (e.g. "v2.0.301"). Empty uses the latest release
 	VerboseMode           bool     // Display all the input resources and not only failed resources
+	ShowEvidence          bool     // Show detailed evidence for failed controls (field values and file locations)
 	Hide                  bool     // Hide sensitive identifiers (names, namespaces, images) in results
 	EncryptionEnabled     bool
 	View                  string                       //

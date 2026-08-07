@@ -436,6 +436,29 @@ func TestSubmitFlag_PropagatesToAllSubcommands(t *testing.T) {
 	}
 }
 
+func TestShowEvidenceFlag_RegisteredWithCorrectDefaults(t *testing.T) {
+	mockKubescape := &mocks.MockIKubescape{}
+	cmd := GetScanCommand(mockKubescape)
+
+	f := cmd.PersistentFlags().Lookup("show-evidence")
+	require.NotNil(t, f, "--show-evidence flag must be registered")
+	assert.Equal(t, "false", f.DefValue)
+	assert.Equal(t, "E", f.Shorthand)
+	assert.False(t, f.Changed)
+}
+
+func TestShowEvidenceFlag_PropagatesToAllSubcommands(t *testing.T) {
+	mockKubescape := &mocks.MockIKubescape{}
+	cmd := GetScanCommand(mockKubescape)
+
+	for _, sub := range cmd.Commands() {
+		t.Run(sub.Name(), func(t *testing.T) {
+			f := sub.InheritedFlags().Lookup("show-evidence")
+			require.NotNil(t, f, "subcommand %q must inherit --show-evidence from the parent scan command", sub.Name())
+		})
+	}
+}
+
 func TestGetScanCommand_DeprecatedFlagsRemoved(t *testing.T) {
 	mockKubescape := &mocks.MockIKubescape{}
 

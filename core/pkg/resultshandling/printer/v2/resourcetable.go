@@ -10,6 +10,7 @@ import (
 	"github.com/jedib0t/go-pretty/v6/text"
 	"github.com/kubescape/k8s-interface/workloadinterface"
 	"github.com/kubescape/kubescape/v3/core/cautils"
+	"github.com/kubescape/kubescape/v3/core/pkg/resultshandling/evidence"
 	"github.com/kubescape/kubescape/v3/core/pkg/resultshandling/printer/v2/prettyprinter"
 	"github.com/kubescape/kubescape/v3/core/pkg/resultshandling/printer/v2/prettyprinter/tableprinter/utils"
 	"github.com/kubescape/opa-utils/reporthandling/results/v1/reportsummary"
@@ -27,6 +28,7 @@ const (
 )
 
 func (prettyPrinter *PrettyPrinter) resourceTable(opaSessionObj *cautils.OPASessionObj) {
+	policy := policyForSession(opaSessionObj, prettyPrinter.showSecrets)
 
 	for resourceID, result := range opaSessionObj.ResourcesResult {
 		if !result.GetStatus(nil).IsFailed() {
@@ -58,7 +60,7 @@ func (prettyPrinter *PrettyPrinter) resourceTable(opaSessionObj *cautils.OPASess
 		summaryTable.Style().Format.Header = text.FormatDefault
 		summaryTable.Style().Box = table.StyleBoxRounded
 
-		resourceRows := generateResourceRows(result.ListControls(), &opaSessionObj.Report.SummaryDetails, resource)
+		resourceRows := generateResourceRows(result.ListControls(), &opaSessionObj.Report.SummaryDetails, resource, policy)
 
 		short := utils.CheckShortTerminalWidth(resourceRows, generateResourceHeader(false))
 		if short {
@@ -73,7 +75,8 @@ func (prettyPrinter *PrettyPrinter) resourceTable(opaSessionObj *cautils.OPASess
 
 }
 
-func generateResourceRows(controls []resourcesresults.ResourceAssociatedControl, summaryDetails *reportsummary.SummaryDetails, resource workloadinterface.IMetadata) []table.Row {
+func generateResourceRows(controls []resourcesresults.ResourceAssociatedControl, summaryDetails *reportsummary.SummaryDetails, resource workloadinterface.IMetadata, policy *evidence.Policy) []table.Row {
+	view := evidence.NewResourceView(resource)
 	var rows []table.Row
 
 	for i := range controls {
@@ -84,7 +87,7 @@ func generateResourceRows(controls []resourcesresults.ResourceAssociatedControl,
 		}
 
 		row[resourceColumnURL] = cautils.GetControlLink(controls[i].GetID())
-		paths := AssistedRemediationPathsWithCurrentValues(&controls[i], resource)
+		paths := AssistedRemediationPathsWithCurrentValues(&controls[i], view, policy)
 		addContainerNameToAssistedRemediation(resource, &paths)
 		row[resourceColumnPath] = strings.Join(paths, "\n")
 		row[resourceColumnName] = controls[i].GetName()

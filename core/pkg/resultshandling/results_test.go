@@ -188,7 +188,7 @@ func TestCombinedJSONAndYAMLOutputDoesNotMutateSubmittedSession(t *testing.T) {
 		extension string
 		printer   func() printer.IPrinter
 	}{
-		{name: "json", extension: ".json", printer: func() printer.IPrinter { return printerv2.NewJsonPrinter("") }},
+		{name: "json", extension: ".json", printer: func() printer.IPrinter { return printerv2.NewJsonPrinter("", false, false) }},
 		{name: "yaml", extension: ".yaml", printer: func() printer.IPrinter { return printerv2.NewYamlPrinter() }},
 	}
 

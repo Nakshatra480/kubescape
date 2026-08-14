@@ -6,6 +6,7 @@ import (
 	"github.com/armosec/armoapi-go/armotypes"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/kubescape/k8s-interface/workloadinterface"
+	"github.com/kubescape/kubescape/v3/core/pkg/resultshandling/evidence"
 	"github.com/kubescape/opa-utils/reporthandling/apis"
 	"github.com/kubescape/opa-utils/reporthandling/results/v1/reportsummary"
 	"github.com/kubescape/opa-utils/reporthandling/results/v1/resourcesresults"
@@ -517,7 +518,7 @@ func TestGenerateResourceRows_Loop(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rows := generateResourceRows(tt.controls, &tt.summaryDetails, tt.resource)
+			rows := generateResourceRows(tt.controls, &tt.summaryDetails, tt.resource, evidence.DefaultPolicy(false))
 			assert.Equal(t, tt.expectedLen, len(rows))
 			//remediation is the last column of the first row
 			if len(rows) != 0 {

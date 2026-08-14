@@ -54,6 +54,8 @@ kubescape scan [target] [flags]
 | `-o, --output <path>` | Output file path | stdout |
 | `--scan-images` | Also scan container images for vulnerabilities | `false` |
 | `--severity-threshold <sev>` | Fail if findings at or above severity: `low`, `medium`, `high`, `critical` | - |
+| `-E, --show-evidence` | For each failed resource, show the field that triggered the control and the value it holds. Adds an `evidence` array to `--format json` | `false` |
+| `--show-secrets` | Reveal evidence values hidden because they look like credentials. Requires `--show-evidence` | `false` |
 | `--submit` | Submit results to Kubescape SaaS | `false` |
 | `--use-artifacts-from <path>` | Load artifacts from local directory (offline mode) | - |
 | `--use-from <path>` | Load specific policy from path | - |
@@ -72,6 +74,12 @@ kubescape scan framework cis-v1.23-t1.0.1
 
 # Scan specific control
 kubescape scan control C-0005 -v
+
+# Show which field failed each control, and the value it holds
+kubescape scan framework nsa -E
+
+# Reveal evidence values that are hidden by default
+kubescape scan framework nsa -E --show-secrets
 
 # Scan local files
 kubescape scan /path/to/manifests/

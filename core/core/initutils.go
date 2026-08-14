@@ -422,7 +422,7 @@ func GetUIPrinter(ctx context.Context, scanInfo *cautils.ScanInfo, clusterName s
 		return &printerv2.SilentPrinter{}
 	}
 
-	p := printerv2.NewPrettyPrinter(scanInfo.VerboseMode, scanInfo.FormatVersion, scanInfo.PrintAttackTree, cautils.ViewTypes(scanInfo.View), scanInfo.ScanType, scanInfo.InputPatterns, clusterName)
+	p := printerv2.NewPrettyPrinter(scanInfo.VerboseMode, scanInfo.FormatVersion, scanInfo.PrintAttackTree, cautils.ViewTypes(scanInfo.View), scanInfo.ScanType, scanInfo.InputPatterns, clusterName, scanInfo.ShowEvidence, scanInfo.ShowSecrets)
 	if err := p.SetWriter(ctx, ""); err != nil {
 		logger.L().Ctx(ctx).Warning("failed to configure terminal output", helpers.Error(err))
 		return &printerv2.SilentPrinter{}

@@ -41,9 +41,11 @@ type PrettyPrinter struct {
 	inputPatterns   []string
 	verboseMode     bool
 	printAttackTree bool
+	showEvidence    bool
+	showSecrets     bool
 }
 
-func NewPrettyPrinter(verboseMode bool, formatVersion string, attackTree bool, viewType cautils.ViewTypes, scanType cautils.ScanTypes, inputPatterns []string, clusterName string) *PrettyPrinter {
+func NewPrettyPrinter(verboseMode bool, formatVersion string, attackTree bool, viewType cautils.ViewTypes, scanType cautils.ScanTypes, inputPatterns []string, clusterName string, showEvidence, showSecrets bool) *PrettyPrinter {
 	prettyPrinter := &PrettyPrinter{
 		verboseMode:     verboseMode,
 		formatVersion:   formatVersion,
@@ -52,6 +54,8 @@ func NewPrettyPrinter(verboseMode bool, formatVersion string, attackTree bool, v
 		scanType:        scanType,
 		inputPatterns:   inputPatterns,
 		clusterName:     clusterName,
+		showEvidence:    showEvidence,
+		showSecrets:     showSecrets,
 	}
 
 	return prettyPrinter
@@ -129,6 +133,10 @@ func (pp *PrettyPrinter) ActionPrint(_ context.Context, opaSessionObj *cautils.O
 			if pp.verboseMode {
 				pp.resourceTable(opaSessionObj)
 			}
+		}
+
+		if pp.showEvidence {
+			pp.printEvidence(opaSessionObj)
 		}
 
 		pp.printOverview(opaSessionObj, pp.verboseMode)

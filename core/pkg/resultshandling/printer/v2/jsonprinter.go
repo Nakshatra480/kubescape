@@ -27,12 +27,14 @@ const (
 var _ printer.IPrinter = &JsonPrinter{}
 
 type JsonPrinter struct {
-	writer      *os.File
-	minSeverity string
+	writer       *os.File
+	minSeverity  string
+	showEvidence bool
+	showSecrets  bool
 }
 
-func NewJsonPrinter(minSeverity string) *JsonPrinter {
-	return &JsonPrinter{minSeverity: minSeverity}
+func NewJsonPrinter(minSeverity string, showEvidence, showSecrets bool) *JsonPrinter {
+	return &JsonPrinter{minSeverity: minSeverity, showEvidence: showEvidence, showSecrets: showSecrets}
 }
 
 func (jp *JsonPrinter) SetWriter(ctx context.Context, outputFile string) error {
@@ -136,6 +138,9 @@ func printConfigurationsScanning(opaSessionObj *cautils.OPASessionObj, imageScan
 	// extract specified labels from workloads, and attach scan coverage gaps.
 	reportWithSeverity := ConvertToPostureReportWithSeverityLabelsAndCoverage(finalizedReport, opaSessionObj.LabelsToCopy, opaSessionObj.AllResources, &opaSessionObj.ScanCoverage)
 	FilterBySeverity(reportWithSeverity, jp.minSeverity)
+	if jp.showEvidence {
+		reportWithSeverity.Evidence = buildEvidenceReport(opaSessionObj, jp.showSecrets)
+	}
 
 	r, err := json.Marshal(reportWithSeverity)
 	if err != nil {

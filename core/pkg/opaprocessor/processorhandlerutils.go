@@ -385,7 +385,7 @@ func overrideMapField(workload workloadinterface.IWorkload, field string) {
 		return
 	}
 	for key := range data {
-		workloadinterface.SetInMap(workload.GetObject(), []string{field}, key, "XXXXXX")
+		workloadinterface.SetInMap(workload.GetObject(), []string{field}, key, cautils.MaskedValue)
 	}
 }
 
@@ -425,7 +425,7 @@ func removeContainersData(containers []corev1.Container) {
 	for i := range containers {
 		container := &containers[i]
 		for j := range container.Env {
-			container.Env[j].Value = "XXXXXX"
+			container.Env[j].Value = cautils.MaskedValue
 			container.Env[j].ValueFrom = nil
 		}
 		container.EnvFrom = nil
@@ -435,7 +435,7 @@ func removeEphemeralContainersData(containers []corev1.EphemeralContainer) {
 	for i := range containers {
 		container := &containers[i]
 		for j := range container.Env {
-			container.Env[j].Value = "XXXXXX"
+			container.Env[j].Value = cautils.MaskedValue
 			container.Env[j].ValueFrom = nil
 		}
 		container.EnvFrom = nil

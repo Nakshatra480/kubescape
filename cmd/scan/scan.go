@@ -78,6 +78,9 @@ func GetScanCommand(ks meta.IKubescape) *cobra.Command {
 					scanInfo.ControlsVersion,
 				)
 			}
+			if scanInfo.ShowSecrets && !scanInfo.ShowEvidence {
+				return fmt.Errorf("--show-secrets has no effect without --show-evidence")
+			}
 			captureKubeconfigSelection(cmd, &scanInfo)
 			applyRegistryCredentialsFromEnv(cmd, &scanInfo)
 			return nil
@@ -212,6 +215,8 @@ func GetScanCommand(ks meta.IKubescape) *cobra.Command {
 	scanCmd.PersistentFlags().BoolVarP(&scanInfo.Local, "keep-local", "", false, "If you do not want your Kubescape results reported to configured backend.")
 	scanCmd.PersistentFlags().StringVarP(&scanInfo.Output, "output", "o", "", "Output file. Print output to file and not stdout")
 	scanCmd.PersistentFlags().BoolVarP(&scanInfo.VerboseMode, "verbose", "v", false, "Display all of the input resources and not only failed resources")
+	scanCmd.PersistentFlags().BoolVarP(&scanInfo.ShowEvidence, "show-evidence", "E", false, "For each failed resource, show the field that triggered the control and the value it currently holds. Values that look like credentials are hidden unless --show-secrets is set")
+	scanCmd.PersistentFlags().BoolVar(&scanInfo.ShowSecrets, "show-secrets", false, "Reveal evidence values that --show-evidence hides by default. Requires --show-evidence. Kubernetes Secret data is never shown")
 	scanCmd.PersistentFlags().StringVar(&scanInfo.View, "view", string(cautils.SecurityViewType), fmt.Sprintf("View results based on the %s/%s/%s. default is --view=%s", cautils.ResourceViewType, cautils.ControlViewType, cautils.SecurityViewType, cautils.SecurityViewType))
 	scanCmd.PersistentFlags().BoolVar(&scanInfo.UseDefault, "use-default", false, "Load local policy object from default path. If not used will download latest")
 	scanCmd.PersistentFlags().StringSliceVar(&scanInfo.UseFrom, "use-from", nil, "Load local policy object from specified path. If not used will download latest")

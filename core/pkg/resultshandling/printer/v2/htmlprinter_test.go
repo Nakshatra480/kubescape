@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/kubescape/kubescape/v3/core/cautils"
+	"github.com/kubescape/kubescape/v3/core/pkg/resultshandling/evidence"
 	"github.com/kubescape/opa-utils/reporthandling/apis"
 	"github.com/kubescape/opa-utils/reporthandling/results/v1/reportsummary"
 	"github.com/kubescape/opa-utils/reporthandling/results/v1/resourcesresults"
@@ -87,7 +88,7 @@ func TestBuildResourceControlResultTable_MissingControl(t *testing.T) {
 	}
 
 	assert.NotPanics(t, func() {
-		results := buildResourceControlResultTable([]resourcesresults.ResourceAssociatedControl{ac}, summaryDetails, nil)
+		results := buildResourceControlResultTable([]resourcesresults.ResourceAssociatedControl{ac}, summaryDetails, nil, evidence.DefaultPolicy(false))
 		assert.Empty(t, results)
 	})
 }

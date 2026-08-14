@@ -19,9 +19,9 @@ import (
 	grypesarif "github.com/anchore/grype/grype/presenter/sarif"
 	"github.com/kubescape/go-logger"
 	"github.com/kubescape/go-logger/helpers"
-	"github.com/kubescape/k8s-interface/workloadinterface"
 	"github.com/kubescape/kubescape/v3/core/cautils"
 	"github.com/kubescape/kubescape/v3/core/pkg/fixhandler"
+	"github.com/kubescape/kubescape/v3/core/pkg/resultshandling/evidence"
 	"github.com/kubescape/kubescape/v3/core/pkg/resultshandling/locationresolver"
 	"github.com/kubescape/kubescape/v3/core/pkg/resultshandling/printer"
 	"github.com/kubescape/opa-utils/objectsenvelopes/localworkload"
@@ -118,10 +118,10 @@ func (sp *SARIFPrinter) addRule(scanRun *sarif.Run, control reportsummary.IContr
 }
 
 // addResult adds a result of checking a rule to the scan run based on the given control summary
-func (sp *SARIFPrinter) addResult(scanRun *sarif.Run, ctl reportsummary.IControlSummary, filepath string, location locationresolver.Location, ac *resourcesresults.ResourceAssociatedControl, resource workloadinterface.IMetadata) *sarif.Result {
+func (sp *SARIFPrinter) addResult(scanRun *sarif.Run, ctl reportsummary.IControlSummary, filepath string, location locationresolver.Location, ac *resourcesresults.ResourceAssociatedControl, view *evidence.ResourceView, policy *evidence.Policy) *sarif.Result {
 	msg := ctl.GetDescription()
-	if resource != nil {
-		if paths := AssistedRemediationPathsWithCurrentValues(ac, resource); len(paths) > 0 {
+	if view != nil {
+		if paths := AssistedRemediationPathsWithCurrentValues(ac, view, policy); len(paths) > 0 {
 			msg += "\n\nAffected fields:\n" + strings.Join(paths, "\n")
 		}
 	}
@@ -219,6 +219,9 @@ func (sp *SARIFPrinter) printConfigurationScan(ctx context.Context, opaSessionOb
 	}
 
 	run := sarif.NewRunWithInformationURI(toolName, toolInfoURI)
+	// SARIF reports are uploaded to code-scanning backends, so evidence values
+	// are always redacted here regardless of --show-secrets.
+	policy := policyForSession(opaSessionObj, false)
 	basePath := getBasePathFromMetadata(*opaSessionObj)
 	failed := make([]scannedResource, 0, len(opaSessionObj.ResourcesResult))
 	for resourceID, result := range opaSessionObj.ResourcesResult {
@@ -248,6 +251,7 @@ func (sp *SARIFPrinter) printConfigurationScan(ctx context.Context, opaSessionOb
 	for _, resource := range groupByManifest(failed) {
 		cache := caches.get(resource.absPath)
 		locationResolver := cache.locationResolver(resource.absPath, "SARIF")
+		view := evidence.NewResourceView(opaSessionObj.AllResources[resource.resourceID])
 
 		for _, toPin := range opaSessionObj.ResourcesResult[resource.resourceID].AssociatedControls {
 			ac := toPin
@@ -260,8 +264,7 @@ func (sp *SARIFPrinter) printConfigurationScan(ctx context.Context, opaSessionOb
 				}
 				location := resolveFixLocation(opaSessionObj, locationResolver, &ac, resource.resourceID)
 				sp.addRule(run, ctl)
-				rsrc := opaSessionObj.AllResources[resource.resourceID]
-				r := sp.addResult(run, ctl, resource.relPath, location, &ac, rsrc)
+				r := sp.addResult(run, ctl, resource.relPath, location, &ac, view, policy)
 				collectFixes(ctx, cache, r, ac, opaSessionObj, resource.resourceID, resource.relPath, resource.absPath)
 			}
 		}

@@ -15,6 +15,7 @@ import (
 	"github.com/kubescape/go-logger/helpers"
 	"github.com/kubescape/k8s-interface/workloadinterface"
 	"github.com/kubescape/kubescape/v3/core/cautils"
+	"github.com/kubescape/kubescape/v3/core/pkg/resultshandling/evidence"
 	"github.com/kubescape/kubescape/v3/core/pkg/resultshandling/printer"
 	"github.com/kubescape/kubescape/v3/core/pkg/resultshandling/printer/v2/prettyprinter/tableprinter/imageprinter"
 	"github.com/kubescape/opa-utils/reporthandling/apis"
@@ -153,6 +154,9 @@ func (hp *HtmlPrinter) Score(score float32) {
 }
 
 func buildResourceTableView(opaSessionObj *cautils.OPASessionObj) ResourceTableView {
+	// The HTML report is a shareable artifact, so evidence values are always
+	// redacted here regardless of --show-secrets.
+	policy := policyForSession(opaSessionObj, false)
 	resourceTableView := make(ResourceTableView, 0)
 	for resourceID, result := range opaSessionObj.ResourcesResult {
 		if result.GetStatus(nil).IsFailed() {
@@ -162,7 +166,7 @@ func buildResourceTableView(opaSessionObj *cautils.OPASessionObj) ResourceTableV
 					helpers.String("resourceID", resourceID))
 				continue
 			}
-			ctlResults := buildResourceControlResultTable(result.AssociatedControls, &opaSessionObj.Report.SummaryDetails, resource)
+			ctlResults := buildResourceControlResultTable(result.AssociatedControls, &opaSessionObj.Report.SummaryDetails, resource, policy)
 			resourceTableView = append(resourceTableView, ResourceResult{resource, ctlResults})
 		}
 	}
@@ -193,17 +197,18 @@ func buildImageScanSummary(imageScanData []cautils.ImageScanData) *imageprinter.
 	return imageScanSummary
 }
 
-func buildResourceControlResult(resourceControl resourcesresults.ResourceAssociatedControl, control reportsummary.IControlSummary, resource workloadinterface.IMetadata) ResourceControlResult {
+func buildResourceControlResult(resourceControl resourcesresults.ResourceAssociatedControl, control reportsummary.IControlSummary, view *evidence.ResourceView, policy *evidence.Policy) ResourceControlResult {
 	ctlSeverity := apis.ControlSeverityToString(control.GetScoreFactor())
 	ctlName := resourceControl.GetName()
 	ctlID := resourceControl.GetID()
 	ctlURL := cautils.GetControlLink(resourceControl.GetID())
-	failedPaths := AssistedRemediationPathsWithCurrentValues(&resourceControl, resource)
+	failedPaths := AssistedRemediationPathsWithCurrentValues(&resourceControl, view, policy)
 
 	return ResourceControlResult{ctlSeverity, ctlName, ctlID, ctlURL, failedPaths}
 }
 
-func buildResourceControlResultTable(resourceControls []resourcesresults.ResourceAssociatedControl, summaryDetails *reportsummary.SummaryDetails, resource workloadinterface.IMetadata) []ResourceControlResult {
+func buildResourceControlResultTable(resourceControls []resourcesresults.ResourceAssociatedControl, summaryDetails *reportsummary.SummaryDetails, resource workloadinterface.IMetadata, policy *evidence.Policy) []ResourceControlResult {
+	view := evidence.NewResourceView(resource)
 	var ctlResults []ResourceControlResult
 	for _, resourceControl := range resourceControls {
 		if resourceControl.GetStatus(nil).IsFailed() {
@@ -211,7 +216,7 @@ func buildResourceControlResultTable(resourceControls []resourcesresults.Resourc
 			if control == nil {
 				continue
 			}
-			ctlResult := buildResourceControlResult(resourceControl, control, resource)
+			ctlResult := buildResourceControlResult(resourceControl, control, view, policy)
 
 			ctlResults = append(ctlResults, ctlResult)
 		}

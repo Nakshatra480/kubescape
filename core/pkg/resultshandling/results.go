@@ -192,7 +192,7 @@ func NewPrinter(ctx context.Context, printFormat string, scanInfo *cautils.ScanI
 			logger.L().Ctx(ctx).Warning("Deprecated format version", helpers.String("run", "--format-version=v2"))
 			return printerv1.NewJsonPrinter()
 		default:
-			return printerv2.NewJsonPrinter(scanInfo.MinSeverity)
+			return printerv2.NewJsonPrinter(scanInfo.MinSeverity, scanInfo.ShowEvidence, scanInfo.ShowSecrets)
 		}
 	case printer.YamlFormat:
 		if scanInfo.FormatVersion == "v1" {
@@ -223,7 +223,7 @@ func NewPrinter(ctx context.Context, printFormat string, scanInfo *cautils.ScanI
 		if printFormat != printer.PrettyFormat {
 			logger.L().Ctx(ctx).Warning(fmt.Sprintf("Invalid format \"%s\", default format \"pretty-printer\" is applied", printFormat))
 		}
-		return printerv2.NewPrettyPrinter(scanInfo.VerboseMode, scanInfo.FormatVersion, scanInfo.PrintAttackTree, cautils.ViewTypes(scanInfo.View), scanInfo.ScanType, scanInfo.InputPatterns, clusterName)
+		return printerv2.NewPrettyPrinter(scanInfo.VerboseMode, scanInfo.FormatVersion, scanInfo.PrintAttackTree, cautils.ViewTypes(scanInfo.View), scanInfo.ScanType, scanInfo.InputPatterns, clusterName, scanInfo.ShowEvidence, scanInfo.ShowSecrets)
 	}
 }
 

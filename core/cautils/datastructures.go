@@ -21,6 +21,12 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
+// MaskedValue replaces container env values and Secret and ConfigMap data
+// before results are reported, so those never reach an output file or the
+// backend. The original is not kept anywhere, which is why no output flag can
+// bring it back.
+const MaskedValue = "XXXXXX"
+
 // K8SResources map[<api group>/<api version>/<resource>][]<resourceID>
 type K8SResources map[string][]string
 type ExternalResources map[string][]string

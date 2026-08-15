@@ -1,6 +1,7 @@
 package fleet
 
 import (
+	"sort"
 	"time"
 
 	"github.com/kubescape/opa-utils/reporthandling/apis"
@@ -25,8 +26,12 @@ type ControlOutcome struct {
 // report be collected immediately, so memory grows with the number of controls
 // instead.
 type ClusterSnapshot struct {
-	Context         string
-	ClusterName     string
+	Context     string
+	ClusterName string
+	// Frameworks records what this cluster was scanned with. A fleet report is
+	// only a like-for-like comparison if every cluster used the same set, and
+	// without recording it a reader cannot tell.
+	Frameworks      []string
 	ComplianceScore float32
 	Status          apis.ScanningStatus
 	Controls        map[string]ControlOutcome
@@ -42,6 +47,7 @@ func Snapshot(kubeContext string, report *v2.PostureReport, err error, took time
 		Err:      err,
 		Duration: took,
 	}
+	snapshot.Frameworks = frameworksOf(report)
 	if report == nil {
 		return snapshot
 	}
@@ -77,4 +83,20 @@ func (s ClusterSnapshot) counts() (failed, passed, skipped int) {
 		}
 	}
 	return failed, passed, skipped
+}
+
+// frameworksOf reads the framework names the scan actually ran, rather than the
+// names the caller asked for, so the report describes what happened.
+func frameworksOf(report *v2.PostureReport) []string {
+	if report == nil {
+		return nil
+	}
+	names := make([]string, 0, len(report.SummaryDetails.Frameworks))
+	for _, framework := range report.SummaryDetails.Frameworks {
+		if name := framework.GetName(); name != "" {
+			names = append(names, name)
+		}
+	}
+	sort.Strings(names)
+	return names
 }

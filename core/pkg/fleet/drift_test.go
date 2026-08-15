@@ -109,3 +109,14 @@ func TestStatusLabel(t *testing.T) {
 	assert.Equal(t, "-", StatusLabel(NotScanned))
 	assert.Equal(t, "?", StatusLabel(apis.StatusUnknown))
 }
+
+// The rule that decides drift lives in one place on purpose, because whether a
+// skipped control counts as different from a failed one is a call maintainers
+// may want to reverse.
+func TestStatusesDifferIsTheOnlyDriftRule(t *testing.T) {
+	assert.True(t, statusesDiffer(apis.StatusFailed, apis.StatusPassed))
+	assert.True(t, statusesDiffer(apis.StatusSkipped, apis.StatusFailed), "skipped is not treated as equivalent to failed")
+	assert.True(t, statusesDiffer(NotScanned, apis.StatusPassed))
+	assert.False(t, statusesDiffer(apis.StatusPassed, apis.StatusPassed))
+	assert.False(t, statusesDiffer(apis.StatusFailed, apis.StatusFailed))
+}

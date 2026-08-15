@@ -98,3 +98,43 @@ func TestTruncate(t *testing.T) {
 	assert.Equal(t, "aaaaaaa...", truncate("aaaaaaaaaaaaaaa", 10))
 	assert.Equal(t, "ab", truncate("abc", 2))
 }
+
+// A golden rendering so a future refactor of the aggregate or the printer is
+// provably behaviour-preserving without needing a cluster.
+func TestPrintTableGoldenOutput(t *testing.T) {
+	report := Build([]ClusterSnapshot{
+		scanned("staging", "staging-eu", 90, map[string]apis.ScanningStatus{
+			"C-0016": apis.StatusPassed,
+			"C-0017": apis.StatusPassed,
+		}),
+		scanned("prod", "prod-eu", 60, map[string]apis.ScanningStatus{
+			"C-0016": apis.StatusFailed,
+			"C-0017": apis.StatusPassed,
+		}),
+		unreachable("dr", "dial tcp: i/o timeout"),
+	}, "staging")
+
+	var out bytes.Buffer
+	PrintTable(&out, report, false)
+
+	want := `+---------+------------+---------+------------+--------+--------+---------+
+| Context | Cluster    | Scanned | Compliance | Failed | Passed | Skipped |
++---------+------------+---------+------------+--------+--------+---------+
+| staging | staging-eu | yes     | 90.0%      |      0 |      2 |       0 |
+| prod    | prod-eu    | yes     | 60.0%      |      1 |      1 |       0 |
+| dr      |            | no      | -          |      0 |      0 |       0 |
++---------+------------+---------+------------+--------+--------+---------+
+dr was not scanned: dial tcp: i/o timeout
+
++---------+----------------+---------+------+----+-------+
+| Control | Name           | staging | prod | dr | Drift |
++---------+----------------+---------+------+----+-------+
+| C-0016  | control C-0016 | pass    | fail | -  | yes   |
+| C-0017  | control C-0017 | pass    | pass | -  |       |
++---------+----------------+---------+------+----+-------+
+
+Baseline: staging. 1 of 2 controls differ from it.
+`
+
+	assert.Equal(t, want, out.String())
+}

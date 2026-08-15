@@ -213,3 +213,23 @@ func TestSnapshotOfAFailedScan(t *testing.T) {
 	assert.Equal(t, "dr", snapshot.Context)
 	assert.Error(t, snapshot.Err)
 }
+
+// A fleet report is only a like-for-like comparison if every cluster ran the
+// same frameworks, so the report records what each one actually ran.
+func TestSnapshotRecordsFrameworksActuallyScanned(t *testing.T) {
+	report := reportWith("prod", 70, map[string]apis.ScanningStatus{"C-0016": apis.StatusFailed})
+	report.SummaryDetails.Frameworks = []reportsummary.FrameworkSummary{
+		{Name: "nsa"}, {Name: "mitre"},
+	}
+
+	snapshot := Snapshot("prod", report, nil, 0)
+
+	assert.Equal(t, []string{"mitre", "nsa"}, snapshot.Frameworks, "sorted so repeat runs match")
+
+	fleetReport := Build([]ClusterSnapshot{snapshot}, "")
+	assert.Equal(t, []string{"mitre", "nsa"}, fleetReport.Clusters[0].Frameworks)
+}
+
+func TestSnapshotOfAFailedScanRecordsNoFrameworks(t *testing.T) {
+	assert.Nil(t, Snapshot("dr", nil, errors.New("unreachable"), 0).Frameworks)
+}

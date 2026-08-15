@@ -3,6 +3,7 @@ package fleet
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -216,4 +217,30 @@ func TestRunRecordsHowLongEachClusterTook(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Greater(t, snapshots[0].Duration, time.Duration(0))
+}
+
+// Aggregation is linear in clusters times controls, so a fleet an order of
+// magnitude larger than the usual test fixture should still be quick.
+func TestRunHandlesALargeFleet(t *testing.T) {
+	const clusters = 100
+
+	contexts := make([]string, 0, clusters)
+	for i := range clusters {
+		contexts = append(contexts, fmt.Sprintf("cluster-%03d", i))
+	}
+
+	orchestrator := NewOrchestrator(func(_ context.Context, kubeContext string) (*v2.PostureReport, error) {
+		return passingScan(kubeContext), nil
+	})
+
+	snapshots, err := orchestrator.Run(context.Background(), contexts)
+	require.NoError(t, err)
+	require.Len(t, snapshots, clusters)
+
+	report := Build(snapshots, contexts[0])
+	assert.Len(t, report.Clusters, clusters)
+	for _, row := range report.Controls {
+		assert.Len(t, row.Status, clusters)
+	}
+	assert.Equal(t, contexts, report.Contexts(), "order is preserved across a large fleet")
 }

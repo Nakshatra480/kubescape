@@ -27,6 +27,7 @@ type ClusterSummary struct {
 	Error           string              `json:"error,omitempty"`
 	ComplianceScore float32             `json:"complianceScore"`
 	Status          apis.ScanningStatus `json:"status,omitempty"`
+	Frameworks      []string            `json:"frameworks,omitempty"`
 	Failed          int                 `json:"failedControls"`
 	Passed          int                 `json:"passedControls"`
 	Skipped         int                 `json:"skippedControls"`
@@ -79,6 +80,7 @@ func summarizeClusters(snapshots []ClusterSnapshot) []ClusterSummary {
 			ClusterName:     snapshot.ClusterName,
 			Scanned:         snapshot.Scanned(),
 			ComplianceScore: snapshot.ComplianceScore,
+			Frameworks:      snapshot.Frameworks,
 			Status:          snapshot.Status,
 			Failed:          failed,
 			Passed:          passed,

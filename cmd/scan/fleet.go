@@ -159,7 +159,12 @@ func runFleetScan(ctx context.Context, out io.Writer, ks meta.IKubescape, scanIn
 // cluster.
 func clusterScanner(ks meta.IKubescape, scanInfo *cautils.ScanInfo, frameworks string) fleet.ScanFunc {
 	return func(_ context.Context, kubeContext string) (*v2.PostureReport, error) {
-		k8sinterface.SetClusterContextName(kubeContext)
+		// EnterClusterContext restores the previous context when leave runs, so a
+		// fleet scan does not leave the process pointed at whichever cluster it
+		// happened to finish on.
+		leave := cautils.EnterClusterContext(kubeContext)
+		defer leave()
+
 		if err := k8sinterface.LoadK8sConfig(); err != nil {
 			return nil, fmt.Errorf("context %q: %w", kubeContext, err)
 		}

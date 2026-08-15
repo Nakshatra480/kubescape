@@ -25,7 +25,7 @@ func markDrift(report *FleetReport, baseline string) {
 			if cluster.Context == baseline || !cluster.Scanned {
 				continue
 			}
-			if row.Status[cluster.Context] != want {
+			if statusesDiffer(row.Status[cluster.Context], want) {
 				row.Drift = true
 				break
 			}
@@ -35,6 +35,19 @@ func markDrift(report *FleetReport, baseline string) {
 
 // baselineIsUsable reports whether the named context produced results. Comparing
 // against a cluster whose own scan failed would call every control drifted.
+// statusesDiffer decides what counts as drift, and is deliberately the only
+// place that decision is made.
+//
+// Statuses are compared as they are, without collapsing them, so a control the
+// baseline failed and another cluster skipped counts as drift. Skipped means the
+// control did not apply there, which is a real difference between the two
+// clusters and usually the more interesting one. Treating skipped as equivalent
+// to pass would be a one-line change here, and it is a call worth confirming
+// with maintainers rather than burying in a comparison.
+func statusesDiffer(got, want apis.ScanningStatus) bool {
+	return got != want
+}
+
 func baselineIsUsable(report *FleetReport, context string) bool {
 	for _, cluster := range report.Clusters {
 		if cluster.Context == context {

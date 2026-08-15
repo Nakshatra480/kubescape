@@ -3,7 +3,6 @@ package fleet
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"testing"
 
 	"github.com/kubescape/opa-utils/reporthandling/apis"
@@ -13,15 +12,15 @@ import (
 
 func twoClusterReport(t *testing.T) *FleetReport {
 	t.Helper()
-	return Build([]ClusterResult{
-		{Context: "staging", Report: reportWith("staging-eu", 90, map[string]apis.ScanningStatus{
+	return Build([]ClusterSnapshot{
+		scanned("staging", "staging-eu", 90, map[string]apis.ScanningStatus{
 			"C-0016": apis.StatusPassed,
 			"C-0017": apis.StatusPassed,
-		})},
-		{Context: "prod", Report: reportWith("prod-eu", 60, map[string]apis.ScanningStatus{
+		}),
+		scanned("prod", "prod-eu", 60, map[string]apis.ScanningStatus{
 			"C-0016": apis.StatusFailed,
 			"C-0017": apis.StatusPassed,
-		})},
+		}),
 	}, "staging")
 }
 
@@ -53,9 +52,9 @@ func TestPrintTableDriftOnlyHidesAgreeingControls(t *testing.T) {
 }
 
 func TestPrintTableWithNoDriftSaysSo(t *testing.T) {
-	report := Build([]ClusterResult{
-		{Context: "staging", Report: reportWith("staging", 90, map[string]apis.ScanningStatus{"C-0016": apis.StatusPassed})},
-		{Context: "prod", Report: reportWith("prod", 90, map[string]apis.ScanningStatus{"C-0016": apis.StatusPassed})},
+	report := Build([]ClusterSnapshot{
+		scanned("staging", "staging", 90, map[string]apis.ScanningStatus{"C-0016": apis.StatusPassed}),
+		scanned("prod", "prod", 90, map[string]apis.ScanningStatus{"C-0016": apis.StatusPassed}),
 	}, "staging")
 
 	var out bytes.Buffer
@@ -67,9 +66,9 @@ func TestPrintTableWithNoDriftSaysSo(t *testing.T) {
 // A partial fleet scan must say which clusters are missing, or it reads as a
 // complete answer.
 func TestPrintTableNamesUnscannedClusters(t *testing.T) {
-	report := Build([]ClusterResult{
-		{Context: "prod", Report: reportWith("prod", 60, map[string]apis.ScanningStatus{"C-0016": apis.StatusFailed})},
-		{Context: "dr", Err: errors.New("dial tcp: i/o timeout")},
+	report := Build([]ClusterSnapshot{
+		scanned("prod", "prod", 60, map[string]apis.ScanningStatus{"C-0016": apis.StatusFailed}),
+		unreachable("dr", "dial tcp: i/o timeout"),
 	}, "")
 
 	var out bytes.Buffer

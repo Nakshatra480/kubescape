@@ -11,7 +11,7 @@ import "github.com/kubescape/opa-utils/reporthandling/apis"
 // clusters and usually the more interesting one. Clusters whose scan did not
 // complete are excluded, because a failed scan says nothing about posture.
 func markDrift(report *FleetReport, baseline string) {
-	if baseline == "" || !scanned(report, baseline) {
+	if baseline == "" || !baselineIsUsable(report, baseline) {
 		return
 	}
 
@@ -33,7 +33,9 @@ func markDrift(report *FleetReport, baseline string) {
 	}
 }
 
-func scanned(report *FleetReport, context string) bool {
+// baselineIsUsable reports whether the named context produced results. Comparing
+// against a cluster whose own scan failed would call every control drifted.
+func baselineIsUsable(report *FleetReport, context string) bool {
 	for _, cluster := range report.Clusters {
 		if cluster.Context == context {
 			return cluster.Scanned
@@ -62,17 +64,6 @@ func (r *FleetReport) HasDrift() bool {
 		}
 	}
 	return false
-}
-
-// UnscannedClusters returns the contexts whose scan did not complete.
-func (r *FleetReport) UnscannedClusters() []string {
-	var failed []string
-	for _, cluster := range r.Clusters {
-		if !cluster.Scanned {
-			failed = append(failed, cluster.Context)
-		}
-	}
-	return failed
 }
 
 // StatusLabel renders a status for display, keeping not-scanned distinct from

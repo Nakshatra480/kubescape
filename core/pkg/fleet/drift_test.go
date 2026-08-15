@@ -1,7 +1,6 @@
 package fleet
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/kubescape/opa-utils/reporthandling/apis"
@@ -10,15 +9,15 @@ import (
 )
 
 func TestDriftFlagsControlsThatDifferFromBaseline(t *testing.T) {
-	results := []ClusterResult{
-		{Context: "staging", Report: reportWith("staging", 90, map[string]apis.ScanningStatus{
+	results := []ClusterSnapshot{
+		scanned("staging", "staging", 90, map[string]apis.ScanningStatus{
 			"C-0016": apis.StatusPassed,
 			"C-0017": apis.StatusPassed,
-		})},
-		{Context: "prod", Report: reportWith("prod", 60, map[string]apis.ScanningStatus{
+		}),
+		scanned("prod", "prod", 60, map[string]apis.ScanningStatus{
 			"C-0016": apis.StatusFailed,
 			"C-0017": apis.StatusPassed,
-		})},
+		}),
 	}
 
 	report := Build(results, "staging")
@@ -37,9 +36,9 @@ func TestDriftFlagsControlsThatDifferFromBaseline(t *testing.T) {
 // difference from a cluster where it failed. Collapsing skipped into pass would
 // hide exactly the kind of divergence a fleet report exists to show.
 func TestSkippedCountsAsDriftAgainstFailed(t *testing.T) {
-	results := []ClusterResult{
-		{Context: "staging", Report: reportWith("staging", 90, map[string]apis.ScanningStatus{"C-0016": apis.StatusFailed})},
-		{Context: "prod", Report: reportWith("prod", 95, map[string]apis.ScanningStatus{"C-0016": apis.StatusSkipped})},
+	results := []ClusterSnapshot{
+		scanned("staging", "staging", 90, map[string]apis.ScanningStatus{"C-0016": apis.StatusFailed}),
+		scanned("prod", "prod", 95, map[string]apis.ScanningStatus{"C-0016": apis.StatusSkipped}),
 	}
 
 	report := Build(results, "staging")
@@ -52,12 +51,12 @@ func TestSkippedCountsAsDriftAgainstFailed(t *testing.T) {
 // A scan that failed says nothing about posture, so it must not be reported as
 // drift. Otherwise one unreachable cluster would flag every control in the fleet.
 func TestUnscannedClusterDoesNotCountAsDrift(t *testing.T) {
-	results := []ClusterResult{
-		{Context: "staging", Report: reportWith("staging", 90, map[string]apis.ScanningStatus{
+	results := []ClusterSnapshot{
+		scanned("staging", "staging", 90, map[string]apis.ScanningStatus{
 			"C-0016": apis.StatusPassed,
 			"C-0017": apis.StatusPassed,
-		})},
-		{Context: "dr", Err: errors.New("unreachable")},
+		}),
+		unreachable("dr", "unreachable"),
 	}
 
 	report := Build(results, "staging")
@@ -69,9 +68,9 @@ func TestUnscannedClusterDoesNotCountAsDrift(t *testing.T) {
 }
 
 func TestNoBaselineMeansNoDrift(t *testing.T) {
-	results := []ClusterResult{
-		{Context: "staging", Report: reportWith("staging", 90, map[string]apis.ScanningStatus{"C-0016": apis.StatusPassed})},
-		{Context: "prod", Report: reportWith("prod", 60, map[string]apis.ScanningStatus{"C-0016": apis.StatusFailed})},
+	results := []ClusterSnapshot{
+		scanned("staging", "staging", 90, map[string]apis.ScanningStatus{"C-0016": apis.StatusPassed}),
+		scanned("prod", "prod", 60, map[string]apis.ScanningStatus{"C-0016": apis.StatusFailed}),
 	}
 
 	report := Build(results, "")
@@ -83,9 +82,9 @@ func TestNoBaselineMeansNoDrift(t *testing.T) {
 // Naming a baseline whose own scan failed cannot produce a meaningful
 // comparison, so drift is skipped rather than computed against nothing.
 func TestBaselineThatFailedToScanProducesNoDrift(t *testing.T) {
-	results := []ClusterResult{
-		{Context: "staging", Err: errors.New("unreachable")},
-		{Context: "prod", Report: reportWith("prod", 60, map[string]apis.ScanningStatus{"C-0016": apis.StatusFailed})},
+	results := []ClusterSnapshot{
+		unreachable("staging", "unreachable"),
+		scanned("prod", "prod", 60, map[string]apis.ScanningStatus{"C-0016": apis.StatusFailed}),
 	}
 
 	report := Build(results, "staging")
@@ -94,8 +93,8 @@ func TestBaselineThatFailedToScanProducesNoDrift(t *testing.T) {
 }
 
 func TestBaselineNotInFleetProducesNoDrift(t *testing.T) {
-	results := []ClusterResult{
-		{Context: "prod", Report: reportWith("prod", 60, map[string]apis.ScanningStatus{"C-0016": apis.StatusFailed})},
+	results := []ClusterSnapshot{
+		scanned("prod", "prod", 60, map[string]apis.ScanningStatus{"C-0016": apis.StatusFailed}),
 	}
 
 	report := Build(results, "does-not-exist")

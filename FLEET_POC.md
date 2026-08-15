@@ -116,6 +116,25 @@ Deliberately left for the term: where `FleetReport` should finally live in the m
 layout, and where OSS aggregation stops and platform aggregation begins. Both are named
 in the description as open questions for the mentee, so the PoC does not pre-empt them.
 
+## Optimisation: what a fleet run keeps in memory
+
+A `PostureReport` carries every scanned resource and every per-resource result. The
+fleet aggregate reads four fields from it: cluster name, compliance score, status and
+the control summary. Holding one full report per cluster would make memory grow with
+fleet size times cluster size for no reason.
+
+Each scan is reduced to a `ClusterSnapshot` on the way out of the orchestrator, so the
+full report is collectable immediately. Measured with live heap rather than total
+allocations, for 20 clusters of 2000 resources:
+
+| Retained | Memory |
+|---|---:|
+| One full `PostureReport` per cluster | 6634 KB |
+| One `ClusterSnapshot` per cluster | 15 KB |
+
+`TestSnapshotsRetainFarLessThanFullReports` asserts an order of magnitude so it catches
+a regression without failing on allocator noise.
+
 ## Design notes
 
 **Nothing existing changed.** No report schema, printer or public API was touched. The
@@ -144,7 +163,8 @@ Statement coverage on `core/pkg/fleet` is **98.9%**.
 
 ## Known limits
 
-- Sequential only. A large fleet takes the sum of its clusters.
+- Sequential only. A large fleet takes the sum of its clusters. `--scan-timeout` bounds
+  each cluster individually so one hung cluster cannot stall the rest.
 - The per-cluster scan uses one framework set for the whole fleet, chosen by
   `--frameworks`.
 - `FleetReport` lives in `core/pkg/fleet` as a starting point, not a final answer.

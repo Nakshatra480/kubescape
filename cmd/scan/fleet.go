@@ -117,18 +117,19 @@ func runFleetScan(ctx context.Context, out io.Writer, ks meta.IKubescape, scanIn
 	orchestrator.OnClusterStart = func(kubeContext string, index, total int) {
 		logger.L().Info(fmt.Sprintf("scanning cluster %d of %d", index, total), helpers.String("context", kubeContext))
 	}
-	orchestrator.OnClusterDone = func(result fleet.ClusterResult) {
-		if result.Err != nil {
-			logger.L().Warning("cluster scan failed", helpers.String("context", result.Context), helpers.Error(result.Err))
+	orchestrator.OnClusterDone = func(snapshot fleet.ClusterSnapshot) {
+		if snapshot.Err != nil {
+			logger.L().Warning("cluster scan failed", helpers.String("context", snapshot.Context), helpers.Error(snapshot.Err))
 		}
 	}
+	orchestrator.PerClusterTimeout = scanInfo.ScanTimeout
 
-	results, err := orchestrator.Run(ctx, opts.contexts)
+	snapshots, err := orchestrator.Run(ctx, opts.contexts)
 	if err != nil {
 		return err
 	}
 
-	report := fleet.Build(results, opts.baseline)
+	report := fleet.Build(snapshots, opts.baseline)
 
 	if fleetOutputIsJSON(scanInfo.Format) {
 		if err := fleet.PrintJSON(out, report); err != nil {

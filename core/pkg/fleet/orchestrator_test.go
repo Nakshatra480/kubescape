@@ -5,6 +5,7 @@ import (
 	"errors"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/kubescape/opa-utils/reporthandling/apis"
 	v2 "github.com/kubescape/opa-utils/reporthandling/v2"
@@ -48,13 +49,13 @@ func TestRunScansInTheOrderGiven(t *testing.T) {
 		return passingScan(kubeContext), nil
 	})
 
-	results, err := orchestrator.Run(context.Background(), []string{"prod", "staging", "dev"})
+	snapshots, err := orchestrator.Run(context.Background(), []string{"prod", "staging", "dev"})
 
 	require.NoError(t, err)
 	assert.Equal(t, []string{"prod", "staging", "dev"}, order)
-	require.Len(t, results, 3)
-	assert.Equal(t, "prod", results[0].Context)
-	assert.Equal(t, "dev", results[2].Context)
+	require.Len(t, snapshots, 3)
+	assert.Equal(t, "prod", snapshots[0].Context)
+	assert.Equal(t, "dev", snapshots[2].Context)
 }
 
 // For a real fleet some clusters are always unreachable, so one failure must not
@@ -67,14 +68,14 @@ func TestRunContinuesAfterAClusterFails(t *testing.T) {
 		return passingScan(kubeContext), nil
 	})
 
-	results, err := orchestrator.Run(context.Background(), []string{"prod", "dr", "staging"})
+	snapshots, err := orchestrator.Run(context.Background(), []string{"prod", "dr", "staging"})
 
 	require.NoError(t, err)
-	require.Len(t, results, 3)
-	assert.NoError(t, results[0].Err)
-	assert.Error(t, results[1].Err)
-	assert.Nil(t, results[1].Report)
-	assert.NoError(t, results[2].Err, "the cluster after the failure is still scanned")
+	require.Len(t, snapshots, 3)
+	assert.NoError(t, snapshots[0].Err)
+	assert.Error(t, snapshots[1].Err)
+	assert.False(t, snapshots[1].Scanned())
+	assert.NoError(t, snapshots[2].Err, "the cluster after the failure is still scanned")
 }
 
 func TestRunStopsWhenTheCallerCancels(t *testing.T) {
@@ -87,11 +88,11 @@ func TestRunStopsWhenTheCallerCancels(t *testing.T) {
 		return passingScan(kubeContext), nil
 	})
 
-	results, err := orchestrator.Run(ctx, []string{"a", "b", "c"})
+	snapshots, err := orchestrator.Run(ctx, []string{"a", "b", "c"})
 
 	assert.ErrorIs(t, err, context.Canceled)
 	assert.Equal(t, 1, scanned, "cancelling stops the run rather than finishing the list")
-	assert.Len(t, results, 1)
+	assert.Len(t, snapshots, 1)
 }
 
 // A scanner that returns neither report nor error would otherwise produce a
@@ -101,11 +102,11 @@ func TestRunTreatsAMissingReportAsAFailure(t *testing.T) {
 		return nil, nil
 	})
 
-	results, err := orchestrator.Run(context.Background(), []string{"prod"})
+	snapshots, err := orchestrator.Run(context.Background(), []string{"prod"})
 
 	require.NoError(t, err)
-	require.Len(t, results, 1)
-	assert.Error(t, results[0].Err)
+	require.Len(t, snapshots, 1)
+	assert.Error(t, snapshots[0].Err)
 }
 
 func TestRunReportsProgress(t *testing.T) {
@@ -119,7 +120,7 @@ func TestRunReportsProgress(t *testing.T) {
 		assert.Equal(t, 2, total)
 		assert.Equal(t, started, index)
 	}
-	orchestrator.OnClusterDone = func(ClusterResult) { done++ }
+	orchestrator.OnClusterDone = func(ClusterSnapshot) { done++ }
 
 	_, err := orchestrator.Run(context.Background(), []string{"a", "b"})
 
@@ -163,4 +164,56 @@ func TestRunWithoutAScanFunc(t *testing.T) {
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "no scan function")
+}
+
+// A cluster that hangs rather than refusing would otherwise stall every cluster
+// queued behind it.
+func TestRunBoundsEachClusterWithATimeout(t *testing.T) {
+	orchestrator := NewOrchestrator(func(ctx context.Context, kubeContext string) (*v2.PostureReport, error) {
+		if kubeContext == "hangs" {
+			<-ctx.Done()
+			return nil, ctx.Err()
+		}
+		return passingScan(kubeContext), nil
+	})
+	orchestrator.PerClusterTimeout = 50 * time.Millisecond
+
+	started := time.Now()
+	snapshots, err := orchestrator.Run(context.Background(), []string{"hangs", "fine"})
+
+	require.NoError(t, err)
+	require.Len(t, snapshots, 2)
+	assert.False(t, snapshots[0].Scanned())
+	assert.Contains(t, snapshots[0].Err.Error(), "exceeded 50ms")
+	assert.True(t, snapshots[1].Scanned(), "the cluster behind the hung one is still scanned")
+	assert.Less(t, time.Since(started), 2*time.Second)
+}
+
+// The timeout is per cluster, so a slow fleet is not cut short as long as each
+// cluster individually finishes in time.
+func TestPerClusterTimeoutIsNotAFleetBudget(t *testing.T) {
+	orchestrator := NewOrchestrator(func(_ context.Context, kubeContext string) (*v2.PostureReport, error) {
+		time.Sleep(20 * time.Millisecond)
+		return passingScan(kubeContext), nil
+	})
+	orchestrator.PerClusterTimeout = 100 * time.Millisecond
+
+	snapshots, err := orchestrator.Run(context.Background(), []string{"a", "b", "c", "d", "e"})
+
+	require.NoError(t, err)
+	for _, snapshot := range snapshots {
+		assert.True(t, snapshot.Scanned(), "%s should finish inside its own budget", snapshot.Context)
+	}
+}
+
+func TestRunRecordsHowLongEachClusterTook(t *testing.T) {
+	orchestrator := NewOrchestrator(func(_ context.Context, kubeContext string) (*v2.PostureReport, error) {
+		time.Sleep(10 * time.Millisecond)
+		return passingScan(kubeContext), nil
+	})
+
+	snapshots, err := orchestrator.Run(context.Background(), []string{"a"})
+
+	require.NoError(t, err)
+	assert.Greater(t, snapshots[0].Duration, time.Duration(0))
 }

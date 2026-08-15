@@ -453,6 +453,11 @@ func (scanInfo *ScanInfo) SetKubeconfigSelection(path, contextName string) {
 	scanInfo.contextResolved = false
 }
 
+// KubeconfigPath returns the kubeconfig path recorded by the CLI, if any.
+func (scanInfo *ScanInfo) KubeconfigPath() string {
+	return scanInfo.kubeconfigPath
+}
+
 // ResolveClusterContextName resolves the context from the same kubeconfig
 // loading rules selected for the Kubernetes REST client. When neither an
 // explicit path nor a context override is configured, the existing

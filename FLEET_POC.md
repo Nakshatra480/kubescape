@@ -155,11 +155,55 @@ its controls are filled with `-` rather than left blank, and it is excluded from
 because a scan that failed says nothing about posture. One unreachable cluster must not
 flag every control in the fleet.
 
+## Verified across two Kubernetes versions
+
+The scenario most likely to break a cross-cluster comparison is clusters on different
+Kubernetes versions, since the control set itself can differ. Two kind clusters, one on
+v1.31.6 and one on v1.34.0, scanned with the same framework:
+
+```
+| Context      | Cluster      | Scanned | Compliance | Failed | Passed | Skipped |
+| kind-k8s-old | kind-k8s-old | yes     | 72.8%      |     17 |      7 |       2 |
+| kind-k8s-new | kind-k8s-new | yes     | 72.4%      |     18 |      6 |       2 |
+
+| Control | Name               | kind-k8s-old | kind-k8s-new | Drift |
+| C-0044  | Container hostPort | pass         | fail         | yes   |
+
+Baseline: kind-k8s-old. 1 of 26 controls differ from it.
+```
+
+The drift is real and was not planted: C-0044 genuinely differs between these two
+Kubernetes versions. Both clusters record `frameworks: ["NSA"]` in the JSON output, so
+the comparison is confirmed like-for-like rather than assumed to be.
+
 ## Verification
 
 `gofmt`, `go vet ./...` and `go test ./... -short` are clean.
 `go test -race` passes for the new package, `cmd/scan` and `core/cautils`.
 Statement coverage on `core/pkg/fleet` is **98.9%**.
+
+## What the audit changed
+
+Reviewing this against the concerns I listed turned up one real bug and three
+weaknesses worth closing.
+
+**The process was left pointing at the last cluster.** The orchestrator re-points at
+each cluster but never restored the original context, so anything running after a
+fleet scan silently targeted whichever cluster was last in the list. That is the
+failure #2004 described, in a different place. `cautils.EnterClusterContext` already
+exists for this and its doc comment names fleet scans as its intended caller, so the
+fix also deleted the hand-rolled version.
+
+**The drift rule is now in one named place.** Whether a skipped control differs from a
+failed one is a judgement maintainers may want to reverse. `statusesDiffer` isolates
+it, so reversing it is one line rather than a hunt through a comparison.
+
+**Reports record the frameworks each cluster actually ran.** A fleet report is only a
+like-for-like comparison if every cluster used the same policy, and without recording
+it a reader cannot tell.
+
+**The table output has a golden test**, so a future refactor of the aggregate or the
+printer is provably behaviour-preserving without needing a cluster.
 
 ## Known limits
 
@@ -168,3 +212,10 @@ Statement coverage on `core/pkg/fleet` is **98.9%**.
 - The per-cluster scan uses one framework set for the whole fleet, chosen by
   `--frameworks`.
 - `FleetReport` lives in `core/pkg/fleet` as a starting point, not a final answer.
+- One framework set applies to the whole fleet. Per-cluster policy is a question about
+  what a fleet is, so the report records what each cluster ran rather than guessing at
+  the answer.
+- `--baseline` compares cluster to cluster. Comparing every cluster against a written
+  standard is the more useful question and a design decision for the term.
+- The fleet package has no file path or OS-specific handling, so there is nothing
+  platform-specific to test. Aggregation is exercised at 100 clusters in unit tests.

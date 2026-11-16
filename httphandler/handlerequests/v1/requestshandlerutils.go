@@ -235,22 +235,17 @@ func (handler *HTTPHandler) runQueuedScan(scanReq *scanRequestParams) {
 	}
 	if handler.state.isCancelled(scanReq.scanID) {
 		logger.L().Info("skipping cancelled scan", helpers.String("scanID", scanReq.scanID))
-		if scanReq.resp != nil {
-			select {
-			case scanReq.resp <- &utilsmetav1.Response{
-				ID:       scanReq.scanID,
-				Type:     utilsapisv1.ErrorScanResponseType,
-				Response: fmt.Sprintf("scan '%s' was cancelled", scanReq.scanID),
-			}:
-			default:
-			}
-		}
-		deliverScanCallback(scanReq, callbackStatusFailed, "scan cancelled")
 		// The scan never reaches core.Scan, which would otherwise remove its
 		// exceptions temp file. The worker owns the dequeued request.
 		scanReq.releaseScanInfo()
 		handler.state.releaseCancel(scanReq.scanID)
 		handler.state.setNotBusy(scanReq.scanID)
+		feedScanResponse(scanReq, &utilsmetav1.Response{
+			ID:       scanReq.scanID,
+			Type:     utilsapisv1.ErrorScanResponseType,
+			Response: fmt.Sprintf("scan '%s' was cancelled", scanReq.scanID),
+		})
+		deliverScanCallback(scanReq, callbackStatusFailed, "scan cancelled")
 		return
 	}
 	handler.executeScan(scanReq)
